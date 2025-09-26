@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>图像分类系统 - 基于ResNet和CIFAR-10</title>
+    <!-- 引入Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入Font Awesome -->
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    
+    <!-- 配置Tailwind -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3B82F6',
+                        secondary: '#10B981',
+                        accent: '#8B5CF6',
+                        neutral: '#1F2937',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .shadow-soft {
+                box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+            }
+            .transition-custom {
+                transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 font-sans text-gray-800 min-h-screen">
+    <!-- 顶部导航栏 -->
+    <header class="bg-white shadow-md sticky top-0 z-50 transition-custom">
+        <div class="container mx-auto px-4 py-4 flex justify-between items-center">
+            <div class="flex items-center space-x-2">
+                <i class="fa fa-image text-primary text-2xl"></i>
+                <h1 class="text-xl md:text-2xl font-bold text-neutral">图像分类系统</h1>
+            </div>
+            <div class="hidden md:flex items-center space-x-6">
+                <a href="#features" class="hover:text-primary transition-custom">功能</a>
+                <a href="#classes" class="hover:text-primary transition-custom">支持类别</a>
+                <a href="#about" class="hover:text-primary transition-custom">关于</a>
+            </div>
+            <button class="md:hidden text-gray-600 focus:outline-none">
+                <i class="fa fa-bars text-xl"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- 主内容区 -->
+    <main class="container mx-auto px-4 py-8">
+        <!-- 介绍部分 -->
+        <section class="text-center mb-12 max-w-3xl mx-auto">
+            <h2 class="text-[clamp(1.8rem,4vw,2.5rem)] font-bold mb-4 text-neutral">基于ResNet的图像分类</h2>
+            <p class="text-gray-600 text-lg mb-6">上传图片，系统将自动识别图片中的物体类别，包括动物、车辆、交通工具等</p>
+            <div class="flex flex-wrap justify-center gap-4">
+                <span class="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">ResNet算法</span>
+                <span class="px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-sm">CIFAR-10数据集</span>
+                <span class="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm">动物识别</span>
+                <span class="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm">车辆识别</span>
+                <span class="px-3 py-1 bg-red-100 text-red-800 rounded-full text-sm">实时分类</span>
+            </div>
+        </section>
+
+        <!-- 识别区域 -->
+        <section class="max-w-4xl mx-auto bg-white rounded-xl shadow-soft p-6 md:p-8 mb-16">
+            <!-- 图片输入区域 -->
+            <div class="mb-8">
+                <h3 class="text-xl font-semibold mb-4 text-neutral">选择图片进行分类</h3>
+                
+                <!-- 拖放区域 -->
+                <div id="drop-area" class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center mb-6 hover:border-primary transition-custom cursor-pointer">
+                    <i class="fa fa-cloud-upload text-4xl text-gray-400 mb-3"></i>
+                    <p class="text-gray-500 mb-2">拖放图片到这里，或者</p>
+                    <label class="inline-block bg-primary text-white px-4 py-2 rounded-md hover:bg-primary/90 transition-custom cursor-pointer">
+                        <i class="fa fa-folder-open mr-1"></i> 选择图片
+                        <input type="file" id="file-input" accept="image/*" class="hidden">
+                    </label>
+                    <p class="text-xs text-gray-400 mt-3">支持 JPG, PNG 等常见图片格式</p>
+                </div>
+                
+                <!-- 摄像头按钮 -->
+                <div class="text-center">
+                    <button id="camera-btn" class="inline-flex items-center bg-accent text-white px-4 py-2 rounded-md hover:bg-accent/90 transition-custom">
+                        <i class="fa fa-camera mr-2"></i> 使用摄像头
+                    </button>
+                </div>
+            </div>
+            
+            <!-- 图片预览区域 -->
+            <div id="preview-container" class="mb-8 hidden">
+                <h3 class="text-xl font-semibold mb-4 text-neutral">预览图片</h3>
+                <div class="flex justify-center">
+                    <img id="preview-image" class="max-w-full max-h-96 object-contain rounded-lg shadow-md" alt="预览图片">
+                </div>
+            </div>
+            
+            <!-- 识别按钮 -->
+            <div id="predict-btn-container" class="text-center mb-8 hidden">
+                <button id="predict-btn" class="bg-primary text-white px-6 py-3 rounded-md hover:bg-primary/90 transition-custom text-lg font-medium">
+                    <i class="fa fa-search mr-2"></i> 开始分类
+                </button>
+            </div>
+            
+            <!-- 加载状态 -->
+            <div id="loading-indicator" class="text-center mb-8 hidden">
+                <div class="inline-block animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+                <p class="mt-3 text-gray-600">正在分类，请稍候...</p>
+            </div>
+            
+            <!-- 结果展示区域 -->
+            <div id="results-container" class="mb-8 hidden">
+                <h3 class="text-xl font-semibold mb-4 text-neutral">分类结果</h3>
+                <div class="bg-blue-50 p-4 rounded-lg mb-4">
+                    <h4 class="text-lg font-medium mb-2">
+                        最可能的类别: <span id="top-prediction" class="text-primary font-bold"></span>
+                    </h4>
+                    <p class="text-gray-600">
+                        置信度: <span id="confidence" class="font-semibold"></span>
+                    </p>
+                </div>
+                
+                <h4 class="font-medium mb-3">其他可能的类别:</h4>
+                <div id="results-list" class="space-y-2">
+                    <!-- 结果将通过JS动态添加 -->
+                </div>
+            </div>
+        </section>
+        
+        <!-- 支持的类别 -->
+        <section id="classes" class="max-w-4xl mx-auto mb-16">
+            <h2 class="text-2xl md:text-3xl font-bold mb-8 text-center text-neutral">支持分类的类别</h2>
+            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
+                <div class="bg-white p-4 rounded-xl shadow-soft text-center hover:shadow-lg transition-custom">
+                    <i class="fa fa-plane text-3xl text-blue-500 mb-2"></i>
+                    <p>飞机</p>
+                </div>
+                <div class="bg-white p-4 rounded-xl shadow-soft text-center hover:shadow-lg transition-custom">
+                    <i class="fa fa-car text-3xl text-red-500 mb-2"></i>
+                    <p>汽车</p>
+                </div>
+                <div class="bg-white p-4 rounded-xl shadow-soft text-center hover:shadow-lg transition-custom">
+                    <i class="fa fa-dove text-3xl text-blue-400 mb-2"></i>
+                    <p>鸟</p>
+                </div>
+                <div class="bg-white p-4 rounded-xl shadow-soft text-center hover:shadow-lg transition-custom">
+                    <i class="fa fa-cat text-3xl text-gray-500 mb-2"></i>
+                    <p>猫</p>
+                </div>
+                <div class="bg-white p-4 rounded-xl shadow-soft text-center hover:shadow-lg transition-custom">
+                    <i class="fa fa-deer text-3xl text-brown-500 mb-2"></i>
+                    <p>鹿</p>
+                </div>
+                <div class="bg-white p-4 rounded-xl shadow-soft text-center hover:shadow-lg transition-custom">
+                    <i class="fa fa-dog text-3xl text-gray-600 mb-2"></i>
+                    <p>狗</p>
+                </div>
+                <div class="bg-white p-4 rounded-xl shadow-soft text-center hover:shadow-lg transition-custom">
+                    <i class="fa fa-frog text-3xl text-green-500 mb-2"></i>
+                    <p>青蛙</p>
+                </div>
+                <div class="bg-white p-4 rounded-xl shadow-soft text-center hover:shadow-lg transition-custom">
+                    <i class="fa fa-horse text-3xl text-brown-600 mb-2"></i>
+                    <p>马</p>
+                </div>
+                <div class="bg-white p-4 rounded-xl shadow-soft text-center hover:shadow-lg transition-custom">
+                    <i class="fa fa-ship text-3xl text-blue-600 mb-2"></i>
+                    <p>船</p>
+                </div>
+                <div class="bg-white p-4 rounded-xl shadow-soft text-center hover:shadow-lg transition-custom">
+                    <i class="fa fa-truck text-3xl text-blue-700 mb-2"></i>
+                    <p>卡车</p>
+                </div>
+            </div>
+        </section>
+        
+        <!-- 技术说明 -->
+        <section id="features" class="max-w-4xl mx-auto mb-16">
+            <h2 class="text-2xl md:text-3xl font-bold mb-8 text-center text-neutral">技术特点</h2>
+            <div class="grid md:grid-cols-2 gap-6">
+                <div class="bg-white p-6 rounded-xl shadow-soft hover:shadow-lg transition-custom">
+                    <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mb-4">
+                        <i class="fa fa-brain text-primary text-xl"></i>
+                    </div>
+                    <h3 class="text-lg font-semibold mb-2">ResNet架构</h3>
+                    <p class="text-gray-600">采用残差网络(ResNet)算法，通过跳跃连接解决深层网络梯度消失问题，提高特征提取能力和分类准确率。</p>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-soft hover:shadow-lg transition-custom">
+                    <div class="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mb-4">
+                        <i class="fa fa-database text-accent text-xl"></i>
+                    </div>
+                    <h3 class="text-lg font-semibold mb-2">CIFAR-10数据集</h3>
+                    <p class="text-gray-600">使用CIFAR-10数据集训练，包含10个类别的60,000张32x32彩色图像，涵盖动物、车辆和交通工具等多种类别。</p>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-soft hover:shadow-lg transition-custom">
+                    <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mb-4">
+                        <i class="fa fa-image text-secondary text-xl"></i>
+                    </div>
+                    <h3 class="text-lg font-semibold mb-2">数据增强</h3>
+                    <p class="text-gray-600">通过旋转、平移、翻转和缩放等数据增强技术，提高模型的泛化能力，减少过拟合。</p>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-soft hover:shadow-lg transition-custom">
+                    <div class="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center mb-4">
+                        <i class="fa fa-exchange-alt text-yellow-600 text-xl"></i>
+                    </div>
+                    <h3 class="text-lg font-semibold mb-2">前后端分离</h3>
+                    <p class="text-gray-600">采用前后端分离架构，前端负责用户交互，后端处理图像分类请求，提供高效的识别服务。</p>
+                </div>
+            </div>
+        </section>
+        
+        <!-- 关于部分 -->
+        <section id="about" class="max-w-4xl mx-auto mb-16">
+            <h2 class="text-2xl md:text-3xl font-bold mb-6 text-center text-neutral">关于本系统</h2>
+            <div class="bg-white p-6 md:p-8 rounded-xl shadow-soft">
+                <p class="text-gray-600 mb-4">
+                    本系统是一个基于ResNet架构的图像分类应用，使用CIFAR-10数据集进行训练，能够识别10种常见物体类别，包括飞机、汽车、鸟、猫、鹿、狗、青蛙、马、船和卡车。
+                </p>
+                <p class="text-gray-600 mb-4">
+                    ResNet是当前图像识别领域的主流算法之一，通过引入残差块和跳跃连接，有效解决了深层神经网络训练中的梯度消失问题，能够构建更深的网络结构，提取更丰富的图像特征。
+                </p>
+                <p class="text-gray-600">
+                    系统支持图片上传和摄像头拍摄两种输入方式，识别结果会显示最可能的类别及其置信度，以及其他可能的类别排名，为用户提供直观的分类结果。
+                </p>
+            </div>
+        </section>
+    </main>
+
+    <!-- 摄像头模态框 -->
+    <div id="camera-modal" class="fixed inset-0 bg-black/70 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] flex flex-col">
+            <div class="p-4 border-b flex justify-between items-center">
+                <h3 class="text-lg font-semibold">摄像头拍摄</h3>
+                <button id="close-modal" class="text-gray-500 hover:text-gray-700">
+                    <i class="fa fa-times text-xl"></i>
+                </button>
+            </div>
+            <div class="flex-grow p-4 flex flex-col items-center justify-center">
+                <video id="camera-preview" class="max-w-full max-h-[60vh] object-contain rounded-lg mb-4" autoplay playsinline></video>
+                <canvas id="camera-canvas" class="hidden"></canvas>
+                <button id="capture-btn" class="bg-primary text-white px-4 py-2 rounded-md hover:bg-primary/90 transition-custom">
+                    <i class="fa fa-camera mr-1"></i> 拍摄照片
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 页脚 -->
+    <footer class="bg-neutral text-white py-8">
+        <div class="container mx-auto px-4 text-center">
+            <p class="mb-2">基于ResNet和CIFAR-10的图像分类系统</p>
+            <p class="text-sm text-gray-400">© 2023 图像分类项目 | 用于学习和研究</p>
+        </div>
+    </footer>
+
+    <script>
+        // DOM元素
+        const dropArea = document.getElementById('drop-area');
+        const fileInput = document.getElementById('file-input');
+        const cameraBtn = document.getElementById('camera-btn');
+        const cameraModal = document.getElementById('camera-modal');
+        const closeModal = document.getElementById('close-modal');
+        const cameraPreview = document.getElementById('camera-preview');
+        const cameraCanvas = document.getElementById('camera-canvas');
+        const captureBtn = document.getElementById('capture-btn');
+        const previewContainer = document.getElementById('preview-container');
+        const previewImage = document.getElementById('preview-image');
+        const predictBtnContainer = document.getElementById('predict-btn-container');
+        const predictBtn = document.getElementById('predict-btn');
+        const loadingIndicator = document.getElementById('loading-indicator');
+        const resultsContainer = document.getElementById('results-container');
+        const resultsList = document.getElementById('results-list');
+        const topPrediction = document.getElementById('top-prediction');
+        const confidence = document.getElementById('confidence');
+        
+        // 存储待预测的图片
+        let imageToPredict = null;
+        
+        // 设置事件监听器
+        function setupEventListeners() {
+            // 文件上传
+            fileInput.addEventListener('change', handleFileSelect);
+            
+            // 拖放功能
+            dropArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropArea.classList.add('border-primary');
+            });
+            
+            dropArea.addEventListener('dragleave', () => {
+                dropArea.classList.remove('border-primary');
+            });
+            
+            dropArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropArea.classList.remove('border-primary');
+                
+                if (e.dataTransfer.files.length) {
+                    fileInput.files = e.dataTransfer.files;
+                    handleFileSelect(e);
+                }
+            });
+            
+            // 点击拖放区域触发文件选择
+            dropArea.addEventListener('click', (e) => {
+                if (e.target !== fileInput) {
+                    fileInput.click();
+                }
+            });
+            
+            // 摄像头按钮
+            cameraBtn.addEventListener('click', openCameraModal);
+            
+            // 关闭模态框
+            closeModal.addEventListener('click', closeCameraModal);
+            
+            // 点击模态框外部关闭
+            cameraModal.addEventListener('click', (e) => {
+                if (e.target === cameraModal) {
+                    closeCameraModal();
+                }
+            });
+            
+            // 拍摄按钮
+            captureBtn.addEventListener('click', captureImage);
+            
+            // 预测按钮
+            predictBtn.addEventListener('click', sendPredictionRequest);
+        }
+        
+        // 处理文件选择
+        function handleFileSelect(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            if (!file.type.match('image.*')) {
+                alert('请选择图片文件');
+                return;
+            }
+            
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                previewImage.src = e.target.result;
+                imageToPredict = e.target.result;
+                previewContainer.classList.remove('hidden');
+                predictBtnContainer.classList.remove('hidden');
+                resultsContainer.classList.add('hidden');
+            };
+            reader.readAsDataURL(file);
+        }
+        
+        // 打开摄像头模态框
+        async function openCameraModal() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: 'environment' } 
+                });
+                cameraPreview.srcObject = stream;
+                cameraModal.classList.remove('hidden');
+            } catch (error) {
+                console.error('无法访问摄像头:', error);
+                alert('无法访问摄像头，请确保已授予摄像头权限。');
+            }
+        }
+        
+        // 关闭摄像头模态框
+        function closeCameraModal() {
+            const stream = cameraPreview.srcObject;
+            if (stream) {
+                const tracks = stream.getTracks();
+                tracks.forEach(track => track.stop());
+            }
+            cameraPreview.srcObject = null;
+            cameraModal.classList.add('hidden');
+        }
+        
+        // 拍摄图像
+        function captureImage() {
+            const width = cameraPreview.videoWidth;
+            const height = cameraPreview.videoHeight;
+            
+            cameraCanvas.width = width;
+            cameraCanvas.height = height;
+            
+            const ctx = cameraCanvas.getContext('2d');
+            ctx.drawImage(cameraPreview, 0, 0, width, height);
+            
+            // 将拍摄的图像显示在预览区
+            previewImage.src = cameraCanvas.toDataURL('image/jpeg');
+            imageToPredict = previewImage.src;
+            previewContainer.classList.remove('hidden');
+            predictBtnContainer.classList.remove('hidden');
+            resultsContainer.classList.add('hidden');
+            
+            // 关闭摄像头模态框
+            closeCameraModal();
+        }
+        
+        // 发送预测请求到后端
+        async function sendPredictionRequest() {
+            if (!imageToPredict) {
+                alert('请先选择或拍摄一张图片');
+                return;
+            }
+            
+            // 显示加载状态
+            predictBtnContainer.classList.add('hidden');
+            loadingIndicator.classList.remove('hidden');
+            resultsContainer.classList.add('hidden');
+            
+            try {
+                // 将base64图像转换为Blob
+                const response = await fetch(imageToPredict);
+                const blob = await response.blob();
+                
+                // 创建FormData
+                const formData = new FormData();
+                formData.append('image', blob, 'image.jpg');
+                
+                // 发送请求到后端
+                const predictionResponse = await fetch('/predict', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await predictionResponse.json();
+                
+                if (result.error) {
+                    alert(result.error);
+                    loadingIndicator.classList.add('hidden');
+                    predictBtnContainer.classList.remove('hidden');
+                    return;
+                }
+                
+                // 显示结果
+                displayResults(result);
+                
+            } catch (error) {
+                console.error('预测失败:', error);
+                alert('分类失败，请重试。');
+                // 恢复按钮显示
+                loadingIndicator.classList.add('hidden');
+                predictBtnContainer.classList.remove('hidden');
+            }
+        }
+        
+        // 显示预测结果
+        function displayResults(result) {
+            // 隐藏加载状态
+            loadingIndicator.classList.add('hidden');
+            
+            // 显示最可能的类别
+            topPrediction.textContent = result.class;
+            confidence.textContent = `${(result.confidence * 100).toFixed(2)}%`;
+            
+            // 清空之前的结果
+            resultsList.innerHTML = '';
+            
+            // 按置信度排序
+            const sortedPredictions = result.predictions.sort((a, b) => b[1] - a[1]);
+            
+            // 跳过第一个（已单独显示），显示其他结果
+            for (let i = 1; i < sortedPredictions.length; i++) {
+                const [className, conf] = sortedPredictions[i];
+                const confidencePercent = (conf * 100).toFixed(2);
+                
+                if (confidencePercent < 1) continue; // 跳过置信度太低的
+                
+                const resultItem = document.createElement('div');
+                resultItem.className = 'p-2 border rounded flex justify-between items-center hover:bg-gray-50 transition-custom';
+                
+                resultItem.innerHTML = `
+                    <span>${className}</span>
+                    <div class="flex items-center">
+                        <span class="text-sm mr-2 ${confidencePercent > 30 ? 'text-green-600' : 'text-gray-600'}">
+                            ${confidencePercent}%
+                        </span>
+                        <div class="w-24 bg-gray-200 rounded-full h-1.5">
+                            <div class="h-1.5 rounded-full bg-primary" style="width: ${confidencePercent}%"></div>
+                        </div>
+                    </div>
+                `;
+                
+                resultsList.appendChild(resultItem);
+            }
+            
+            // 显示结果
+            resultsContainer.classList.remove('hidden');
+        }
+        
+        // 页面加载完成后初始化
+        window.addEventListener('load', setupEventListeners);
+    </script>
+</body>
+</html>

@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>图像识别应用</title>
+    <!-- 引入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .file-input-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+            cursor: pointer;
+        }
+        .file-input-wrapper input[type=file] {
+            font-size: 100px;
+            position: absolute;
+            left: 0;
+            top: 0;
+            opacity: 0;
+            cursor: pointer;
+        }
+        /* 修复悬停效果：当父元素悬停时，改变按钮的背景色 */
+        .file-input-wrapper:hover #select-button {
+            background-color: #2563eb; /* Tailwind's blue-600 */
+        }
+        /* 类别卡片高亮动画 */
+        .card-highlight {
+            animation: pulse-highlight 1.5s infinite;
+            box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.5); /* green-500 with opacity */
+        }
+        @keyframes pulse-highlight {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        /* 按钮点击动画 */
+        .btn-press {
+            animation: press-effect 0.2s ease-in-out;
+        }
+        @keyframes press-effect {
+            0% { transform: scale(1); }
+            50% { transform: scale(0.95); }
+            100% { transform: scale(1); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
+
+<div class="bg-white p-8 rounded-2xl shadow-xl max-w-lg w-full text-center">
+    <h1 class="text-3xl font-semibold text-gray-800 mb-2">图像识别</h1>
+    <p class="text-gray-600 mb-6">上传一张图片，让我来猜猜它是什么！</p>
+
+    <!-- 可识别的类别列表 -->
+    <div class="mb-6">
+        <h2 class="text-lg font-semibold text-gray-700 mb-4">可识别的类别：</h2>
+        <div id="class-cards" class="grid grid-cols-3 sm:grid-cols-5 gap-3">
+            <div class="bg-gray-50 p-3 rounded-lg flex flex-col items-center justify-center text-gray-700 hover:bg-gray-100 transition-colors duration-200" data-class="飞机">
+                <span class="text-2xl mb-1">✈️</span>
+                <span class="text-sm">飞机</span>
+            </div>
+            <div class="bg-gray-50 p-3 rounded-lg flex flex-col items-center justify-center text-gray-700 hover:bg-gray-100 transition-colors duration-200" data-class="汽车">
+                <span class="text-2xl mb-1">🚗</span>
+                <span class="text-sm">汽车</span>
+            </div>
+            <div class="bg-gray-50 p-3 rounded-lg flex flex-col items-center justify-center text-gray-700 hover:bg-gray-100 transition-colors duration-200" data-class="鸟">
+                <span class="text-2xl mb-1">🐦</span>
+                <span class="text-sm">鸟</span>
+            </div>
+            <div class="bg-gray-50 p-3 rounded-lg flex flex-col items-center justify-center text-gray-700 hover:bg-gray-100 transition-colors duration-200" data-class="猫">
+                <span class="text-2xl mb-1">🐱</span>
+                <span class="text-sm">猫</span>
+            </div>
+            <div class="bg-gray-50 p-3 rounded-lg flex flex-col items-center justify-center text-gray-700 hover:bg-gray-100 transition-colors duration-200" data-class="鹿">
+                <span class="text-2xl mb-1">🦌</span>
+                <span class="text-sm">鹿</span>
+            </div>
+            <div class="bg-gray-50 p-3 rounded-lg flex flex-col items-center justify-center text-gray-700 hover:bg-gray-100 transition-colors duration-200" data-class="狗">
+                <span class="text-2xl mb-1">🐶</span>
+                <span class="text-sm">狗</span>
+            </div>
+            <div class="bg-gray-50 p-3 rounded-lg flex flex-col items-center justify-center text-gray-700 hover:bg-gray-100 transition-colors duration-200" data-class="青蛙">
+                <span class="text-2xl mb-1">🐸</span>
+                <span class="text-sm">青蛙</span>
+            </div>
+            <div class="bg-gray-50 p-3 rounded-lg flex flex-col items-center justify-center text-gray-700 hover:bg-gray-100 transition-colors duration-200" data-class="马">
+                <span class="text-2xl mb-1">🐴</span>
+                <span class="text-sm">马</span>
+            </div>
+            <div class="bg-gray-50 p-3 rounded-lg flex flex-col items-center justify-center text-gray-700 hover:bg-gray-100 transition-colors duration-200" data-class="船">
+                <span class="text-2xl mb-1">⛵</span>
+                <span class="text-sm">船</span>
+            </div>
+            <div class="bg-gray-50 p-3 rounded-lg flex flex-col items-center justify-center text-gray-700 hover:bg-gray-100 transition-colors duration-200" data-class="卡车">
+                <span class="text-2xl mb-1">🚚</span>
+                <span class="text-sm">卡车</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 图片预览区域 -->
+    <div id="image-preview" class="w-full h-auto min-h-[12rem] bg-gray-200 rounded-xl mb-6 flex items-center justify-center overflow-hidden border-2 border-dashed border-gray-400">
+        <span id="placeholder-text" class="text-gray-500">图片预览</span>
+    </div>
+
+    <!-- 上传和预测按钮 -->
+    <div class="flex flex-col sm:flex-row gap-4 mb-6">
+        <div class="flex-1 file-input-wrapper">
+            <button id="select-button" class="w-full bg-blue-500 text-white font-medium py-3 px-6 rounded-lg transition-colors duration-200">
+                选择图片
+            </button>
+            <input type="file" id="file-upload" accept="image/*">
+        </div>
+        <button id="predict-button" class="flex-1 bg-green-500 text-white font-medium py-3 px-6 rounded-lg hover:bg-green-600 transition-colors duration-200" disabled>
+            开始预测
+        </button>
+    </div>
+
+    <!-- 新增的显示详细数据按钮 -->
+    <button id="show-details-button" class="w-full bg-gray-500 text-white font-medium py-3 px-6 rounded-lg hover:bg-gray-600 transition-colors duration-200 mt-4 hidden">
+        显示详细数据
+    </button>
+    <div class="h-4"></div>
+
+    <!-- 结果显示区域 -->
+    <div id="results" class="hidden">
+        <div id="predicted-class" class="text-2xl font-bold text-gray-700 mb-4"></div>
+        <div id="confidence" class="text-lg text-gray-600 mb-6"></div>
+
+        <h3 class="text-md font-semibold text-gray-700 mb-2">所有类别的概率：</h3>
+        <div id="all-predictions" class="space-y-2 text-left"></div>
+    </div>
+
+    <!-- 作者信息 -->
+    <div class="mt-8 pt-4 border-t border-gray-200 text-center text-gray-500 text-sm">
+        <p>这个项目由 4 位作者共同完成。</p>
+        <p>1.常子衡，2.王功傲，3.鞠赫铭，4.李亚涵<p>
+    </div>
+</div>
+
+<script>
+    const fileUpload = document.getElementById('file-upload');
+    const selectButton = document.getElementById('select-button');
+    const imagePreview = document.getElementById('image-preview');
+    const predictButton = document.getElementById('predict-button');
+    const showDetailsButton = document.getElementById('show-details-button');
+    const resultsDiv = document.getElementById('results');
+    const predictedClassDiv = document.getElementById('predicted-class');
+    const confidenceDiv = document.getElementById('confidence');
+    const allPredictionsDiv = document.getElementById('all-predictions');
+    const placeholderText = document.getElementById('placeholder-text');
+    const classCards = document.querySelectorAll('#class-cards > div');
+
+    // 添加按钮点击动画
+    selectButton.addEventListener('click', () => {
+        selectButton.classList.add('btn-press');
+        setTimeout(() => selectButton.classList.remove('btn-press'), 200);
+    });
+    predictButton.addEventListener('click', () => {
+        predictButton.classList.add('btn-press');
+        setTimeout(() => predictButton.classList.remove('btn-press'), 200);
+    });
+    showDetailsButton.addEventListener('click', () => {
+        showDetailsButton.classList.add('btn-press');
+        setTimeout(() => showDetailsButton.classList.remove('btn-press'), 200);
+    });
+
+    fileUpload.addEventListener('change', (event) => {
+        const file = event.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                imagePreview.innerHTML = `<img src="${e.target.result}" alt="图片预览" class="max-w-full max-h-full object-contain mx-auto rounded-xl">`;
+                predictButton.disabled = false;
+                showDetailsButton.classList.add('hidden'); // 隐藏详细数据按钮
+                resultsDiv.classList.add('hidden'); // 隐藏旧的结果
+            };
+            reader.readAsDataURL(file);
+        } else {
+            imagePreview.innerHTML = `<span class="text-gray-500">图片预览</span>`;
+            predictButton.disabled = true;
+            showDetailsButton.classList.add('hidden');
+            resultsDiv.classList.add('hidden');
+        }
+    });
+
+    predictButton.addEventListener('click', async () => {
+        const file = fileUpload.files[0];
+        if (!file) {
+            alert('请先选择一个图片文件！');
+            return;
+        }
+
+        // 移除所有卡片的高亮效果
+        classCards.forEach(card => card.classList.remove('card-highlight'));
+
+        const formData = new FormData();
+        formData.append('image', file);
+
+        predictButton.disabled = true;
+        predictButton.textContent = '预测中...';
+
+        try {
+            const response = await fetch('/predict', {
+                method: 'POST',
+                body: formData,
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP 错误！状态码: ${response.status}`);
+            }
+
+            const data = await response.json();
+            
+            // 显示主要结果
+            predictedClassDiv.textContent = data.class;
+            confidenceDiv.textContent = `置信度: ${(data.confidence * 100).toFixed(2)}%`;
+
+            // 高亮显示预测结果
+            const predictedClass = data.class;
+            const predictedCard = document.querySelector(`[data-class="${predictedClass}"]`);
+            if (predictedCard) {
+                predictedCard.classList.add('card-highlight');
+            }
+
+            // 填充所有预测结果
+            allPredictionsDiv.innerHTML = '';
+            data.predictions.sort((a, b) => b[1] - a[1]).forEach(prediction => {
+                const [className, confidence] = prediction;
+                const confidencePercent = (confidence * 100).toFixed(2);
+                const barWidth = confidence * 100;
+                const barColor = confidence === data.confidence ? 'bg-green-500' : 'bg-blue-300';
+                
+                const item = document.createElement('div');
+                item.className = 'flex items-center space-x-2';
+                item.innerHTML = `
+                    <div class="w-24 text-right text-sm text-gray-600">${className}</div>
+                    <div class="w-full bg-gray-200 rounded-full h-4">
+                        <div class="h-4 rounded-full ${barColor} transition-all duration-300" style="width: ${barWidth}%;"></div>
+                    </div>
+                    <div class="w-12 text-sm text-gray-700">${confidencePercent}%</div>
+                `;
+                allPredictionsDiv.appendChild(item);
+            });
+
+            // 预测完成后，显示“显示详细数据”按钮
+            showDetailsButton.classList.remove('hidden');
+
+        } catch (error) {
+            console.error('预测失败:', error);
+            alert(`预测失败: ${error.message}`);
+        } finally {
+            predictButton.disabled = false;
+            predictButton.textContent = '开始预测';
+        }
+    });
+
+    // 为新的“显示详细数据”按钮添加点击事件
+    showDetailsButton.addEventListener('click', () => {
+        if (resultsDiv.classList.contains('hidden')) {
+            resultsDiv.classList.remove('hidden');
+            showDetailsButton.textContent = '隐藏详细数据';
+        } else {
+            resultsDiv.classList.add('hidden');
+            showDetailsButton.textContent = '显示详细数据';
+        }
+    });
+</script>
+</body>
+</html>
